@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Job {
+  id         String    @id @default(cuid())
+  youtubeUrl String
+  title      String?
+  status     JobStatus @default(PENDING)
+  error      String?
+  clips      Clip[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("jobs")
+}
+
+model Clip {
+  id            String   @id @default(cuid())
+  jobId         String
+  job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  startTime     Float
+  endTime       Float
+  duration      Float
+  filePath      String?
+  thumbnailPath String?
+  viralScore    Float?
+  createdAt     DateTime @default(now())
+
+  @@map("clips")
+}
+
+enum JobStatus {
+  PENDING
+  DOWNLOADING
+  TRANSCRIBING
+  ANALYZING
+  CLIPPING
+  COMPLETED
+  FAILED
+}
