@@ -32,12 +32,16 @@ export default function JobCard({ job, onDelete }: Props) {
   const statusIndex = ORDER.indexOf(job.status as typeof ORDER[number]);
 
   return (
-    <div className="group relative rounded-xl border border-surface-600 bg-surface-800 p-5 transition hover:border-surface-500">
+    <div className="glass-card-dash group relative p-6 transition-[transform] duration-[350ms] ease-[cubic-bezier(0.4,0,0.2,1)] hover:-translate-y-0.5">
       {/* Header row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-surface-700">
-            <Video className="w-5 h-5 text-slate-400" />
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-[18px] bg-black/50 shadow-[inset_0_2px_8px_rgba(0,0,0,0.5)] ring-1 ring-white/8">
+            {job.thumbnail_url ? (
+              <img src={job.thumbnail_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <Video className="w-5 h-5 text-slate-400" />
+            )}
           </div>
           <div className="min-w-0">
             <p className="font-medium text-white truncate">
@@ -72,7 +76,7 @@ export default function JobCard({ job, onDelete }: Props) {
               <div key={step.key} className="flex items-center gap-1 flex-1 last:flex-none">
                 <div
                   className={`h-1.5 rounded-full flex-1 transition-all ${
-                    done ? "bg-violet-500" : active ? "bg-violet-500/60 animate-pulse" : "bg-surface-600"
+                    done ? "bg-violet-500" : active ? "bg-violet-500/60 animate-pulse" : "bg-[#1a1a1a]"
                   }`}
                 />
                 {i === STEPS.length - 1 && (

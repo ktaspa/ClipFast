@@ -3,28 +3,39 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "clean": "rm -rf .next node_modules/.cache",
     "dev": "next dev",
+    "dev:poll": "WATCHPACK_POLLING=true WATCHPACK_POLLING_INTERVAL=2000 next dev",
+    "dev:clean": "npm run clean && next dev",
+    "dev:clean:poll": "npm run clean && npm run dev:poll",
+    "dev:turbo": "next dev --turbo",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "14.2.3",
+    "@types/nodemailer": "^8.0.0",
+    "clsx": "^2.1.1",
+    "firebase": "^12.12.1",
+    "firebase-admin": "^13.8.0",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^0.378.0",
+    "next": "14.2.35",
+    "next-auth": "^4.24.14",
+    "nodemailer": "^7.0.13",
     "react": "^18",
     "react-dom": "^18",
-    "lucide-react": "^0.378.0",
-    "clsx": "^2.1.1",
     "tailwind-merge": "^2.3.0"
   },
   "devDependencies": {
-    "typescript": "^5",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.0.1",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.35",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.3"
+    "typescript": "^5"
   }
 }

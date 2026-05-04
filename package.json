@@ -1,0 +1,12 @@
+{
+  "name": "clipfast",
+  "private": true,
+  "description": "Monorepo-style scripts; app code lives in frontend/ and backend/",
+  "scripts": {
+    "dev": "bash ./start.sh",
+    "frontend": "npm run dev --prefix frontend",
+    "frontend:poll": "npm run dev:poll --prefix frontend",
+    "frontend:clean": "npm run dev:clean --prefix frontend",
+    "backend": "python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
+  }
+}

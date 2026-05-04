@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@/components/AuthProvider";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import ClipCard from "@/components/ClipCard";
@@ -41,6 +42,7 @@ function formatDate(iso: string) {
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { loading: authLoading } = useAuth();
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -57,8 +59,8 @@ export default function JobDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    fetchJob();
-  }, [fetchJob]);
+    if (!authLoading) fetchJob();
+  }, [fetchJob, authLoading]);
 
   // Poll while active
   useEffect(() => {
@@ -69,7 +71,7 @@ export default function JobDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-surface-900 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-[#030303]">
         <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
       </div>
     );
@@ -77,7 +79,7 @@ export default function JobDetailPage() {
 
   if (notFound || !job) {
     return (
-      <div className="min-h-screen bg-surface-900 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-[#030303]">
         <div className="text-center">
           <h2 className="text-xl font-bold text-white mb-2">Job not found</h2>
           <Link href="/dashboard" className="text-violet-400 hover:underline text-sm">
@@ -91,7 +93,7 @@ export default function JobDetailPage() {
   const statusIdx = ORDER.indexOf(job.status);
 
   return (
-    <div className="min-h-screen bg-surface-900">
+    <div className="min-h-screen bg-[#030303]">
       <Navbar />
 
       <main className="mx-auto max-w-6xl px-4 pt-28 pb-16">

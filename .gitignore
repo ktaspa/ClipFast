@@ -2,6 +2,7 @@
 .env
 .env.local
 .env.*.local
+cookies.txt
 
 # Python
 __pycache__/
@@ -24,6 +25,9 @@ frontend/.env.local
 
 # Media (large generated files)
 media/
+
+# Local dev DB (auto-fallback when Postgres is down)
+clipfast_local.db
 
 # macOS
 .DS_Store

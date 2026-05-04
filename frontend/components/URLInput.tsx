@@ -1,16 +1,24 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent, type ReactNode } from "react";
 import { Link2, Loader2, Zap } from "lucide-react";
+import { Primary3DButton } from "@/components/Primary3DButton";
 
 interface Props {
   onSubmit: (url: string) => Promise<void>;
   loading?: boolean;
+  initialUrl?: string;
+  /** Rendered after the submit button (e.g. settings cog). */
+  trailingSlot?: ReactNode;
 }
 
-export default function URLInput({ onSubmit, loading = false }: Props) {
-  const [url, setUrl] = useState("");
+export default function URLInput({ onSubmit, loading = false, initialUrl = "", trailingSlot }: Props) {
+  const [url, setUrl] = useState(initialUrl);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (initialUrl) setUrl(initialUrl);
+  }, [initialUrl]);
 
   const isValidYouTube = (u: string) =>
     /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[^\s&]+/.test(u);
@@ -18,14 +26,8 @@ export default function URLInput({ onSubmit, loading = false }: Props) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const trimmed = url.trim();
-    if (!trimmed) {
-      setError("Please enter a YouTube URL");
-      return;
-    }
-    if (!isValidYouTube(trimmed)) {
-      setError("Please enter a valid YouTube URL");
-      return;
-    }
+    if (!trimmed) { setError("Please enter a YouTube URL"); return; }
+    if (!isValidYouTube(trimmed)) { setError("Please enter a valid YouTube URL"); return; }
     setError("");
     try {
       await onSubmit(trimmed);
@@ -37,45 +39,42 @@ export default function URLInput({ onSubmit, loading = false }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="w-full">
-      <div className="relative flex items-center">
-        {/* Icon */}
-        <div className="pointer-events-none absolute left-4 flex items-center">
-          <Link2 className="h-5 w-5 text-slate-500" />
+      <div className="input-sunken-shell flex flex-col gap-2 sm:flex-row sm:items-stretch">
+        <div className="input-sunken-well flex min-h-0 flex-1 items-center gap-3 py-3">
+          <Link2 className="h-5 w-5 flex-shrink-0 text-slate-500" />
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => { setUrl(e.target.value); setError(""); }}
+            placeholder="Paste a YouTube URL — e.g. https://youtube.com/watch?v=..."
+            disabled={loading}
+            className="min-w-0 flex-1 bg-transparent text-[15px] font-medium tracking-tight text-white outline-none placeholder:text-slate-500 disabled:opacity-60"
+          />
         </div>
-
-        {/* Input */}
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => { setUrl(e.target.value); setError(""); }}
-          placeholder="Paste a YouTube URL — e.g. https://youtube.com/watch?v=..."
-          disabled={loading}
-          className="w-full rounded-xl border border-surface-500 bg-surface-800 py-4 pl-12 pr-44 text-sm text-white placeholder-slate-500 outline-none ring-0 transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/40 disabled:opacity-60"
-        />
-
-        {/* Button */}
-        <button
-          type="submit"
-          disabled={loading || !url.trim()}
-          className="absolute right-2 flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-violet-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 transition hover:from-violet-500 hover:to-violet-400 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Processing…
-            </>
-          ) : (
-            <>
-              <Zap className="h-4 w-4" />
-              Create Clips
-            </>
-          )}
-        </button>
+        <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 sm:px-1 sm:pb-1">
+          <Primary3DButton
+            type="submit"
+            size="md"
+            disabled={loading || !url.trim()}
+            className="w-full justify-center gap-2 sm:w-auto"
+            wrapperClassName="w-full sm:w-auto"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Processing…
+              </>
+            ) : (
+              <>
+                <Zap className="h-4 w-4" />
+                Create clips
+              </>
+            )}
+          </Primary3DButton>
+          {trailingSlot}
+        </div>
       </div>
-
-      {error && (
-        <p className="mt-2 text-xs text-red-400 pl-1">{error}</p>
-      )}
+      {error && <p className="mt-3 pl-1 text-xs text-red-400">{error}</p>}
     </form>
   );
 }

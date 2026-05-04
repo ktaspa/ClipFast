@@ -21,7 +21,7 @@ function ScoreBar({ score }: { score: number }) {
   return (
     <div className="flex items-center gap-2">
       <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 flex-shrink-0" />
-      <div className="flex-1 h-1.5 rounded-full bg-surface-600 overflow-hidden">
+      <div className="flex-1 h-1.5 rounded-full bg-[#1a1a1a] overflow-hidden">
         <div
           className={`h-full rounded-full bg-gradient-to-r ${color} transition-all`}
           style={{ width: `${pct}%` }}
@@ -46,9 +46,9 @@ export default function ClipCard({ clip, index }: Props) {
 
   return (
     <>
-      <div className="group rounded-xl border border-surface-600 bg-surface-800 overflow-hidden transition hover:border-violet-500/50 hover:shadow-lg hover:shadow-violet-500/5">
+      <div className="group rounded-xl border border-white/10 bg-[#0d0d0d] overflow-hidden transition hover:border-violet-500/50 hover:shadow-lg hover:shadow-violet-500/5">
         {/* Thumbnail */}
-        <div className="relative aspect-[9/16] bg-surface-700 overflow-hidden cursor-pointer" onClick={() => setVideoOpen(true)}>
+        <div className="relative aspect-[9/16] bg-[#111111] overflow-hidden cursor-pointer" onClick={() => setVideoOpen(true)}>
           {thumbUrl ? (
             <Image
               src={thumbUrl}
@@ -106,7 +106,7 @@ export default function ClipCard({ clip, index }: Props) {
             <button
               onClick={() => setVideoOpen(true)}
               disabled={!videoUrl}
-              className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-surface-600 hover:bg-surface-500 py-2 text-xs font-medium text-white transition disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-[#1a1a1a] hover:bg-[#222222] py-2 text-xs font-medium text-white transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Play className="w-3.5 h-3.5" />
               Preview
@@ -118,7 +118,7 @@ export default function ClipCard({ clip, index }: Props) {
                 "flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium transition",
                 clip.file_path
                   ? "bg-gradient-to-r from-violet-600 to-violet-500 text-white hover:from-violet-500 hover:to-violet-400"
-                  : "bg-surface-600 text-slate-500 pointer-events-none"
+                  : "bg-[#1a1a1a] text-slate-500 pointer-events-none"
               )}
             >
               <Download className="w-3.5 h-3.5" />
