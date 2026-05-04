@@ -1,6 +1,7 @@
 import yt_dlp
 import os
 import asyncio
+import tempfile
 from typing import Optional
 from yt_dlp.utils import DownloadError
 
@@ -17,6 +18,13 @@ _BLOCKED_MARKERS = (
     "confirm you're not a bot",
     "confirm you’re not a bot",
 )
+
+_CLIENT_ORDERS = [
+    ["web", "mweb", "tv"],
+    ["ios", "android"],
+    ["web_safari"],
+    ["web_embedded"],
+]
 
 
 class _YtDlpLogger:
@@ -57,24 +65,52 @@ async def download_video(youtube_url: str, output_dir: str) -> dict:
     output_dir = os.path.abspath(output_dir)
     os.makedirs(output_dir, exist_ok=True)
 
+    info = await _extract_video_info(youtube_url, output_dir, download=True)
+
+    ext = info.get("ext", "mp4")
+    file_path = os.path.join(output_dir, f"video.{ext}")
+    # Prefer .mp4 if formats were merged
+    mp4_path = os.path.join(output_dir, "video.mp4")
+    if os.path.exists(mp4_path):
+        file_path = mp4_path
+    file_path = os.path.abspath(file_path)
+    if not os.path.isfile(file_path):
+        raise FileNotFoundError(
+            f"Download finished but video file missing: {file_path}"
+        )
+    return {
+        "title": info.get("title", "Untitled Video"),
+        "duration": float(info.get("duration") or 0),
+        "file_path": file_path,
+        "thumbnail_url": _best_thumbnail(info),
+    }
+
+
+async def probe_video_access(youtube_url: str) -> dict:
+    """Preflight a YouTube URL without downloading media."""
+    with tempfile.TemporaryDirectory(prefix="clipfast-youtube-probe-") as td:
+        info = await _extract_video_info(youtube_url, td, download=False)
+    return {
+        "title": info.get("title", "Untitled Video"),
+        "duration": float(info.get("duration") or 0),
+        "thumbnail_url": _best_thumbnail(info),
+    }
+
+
+async def _extract_video_info(youtube_url: str, output_dir: str, *, download: bool) -> dict:
     cookies_file = os.getenv("YT_COOKIES_FILE", "").strip()
     if cookies_file:
         cookies_file = os.path.abspath(cookies_file)
         if not os.path.isfile(cookies_file):
             cookies_file = ""
-
-    client_orders = [
-        ["web", "mweb", "tv"],
-        ["ios", "android"],
-        ["web_safari"],
-        ["web_embedded"],
-    ]
+    proxy_url = (os.getenv("YT_DLP_PROXY_URL") or os.getenv("YTDLP_PROXY_URL") or "").strip()
 
     def _ydl_opts(player_clients: list[str]) -> dict:
         return {
             "format": "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
             "outtmpl": os.path.join(output_dir, "video.%(ext)s"),
             "merge_output_format": "mp4",
+            "skip_download": not download,
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
@@ -83,6 +119,7 @@ async def download_video(youtube_url: str, output_dir: str) -> dict:
             "extractor_retries": 2,
             "socket_timeout": 25,
             "logger": _YtDlpLogger(),
+            **({"proxy": proxy_url} if proxy_url else {}),
             # web with mweb/tv first is fastest in the normal case; the later
             # orders are only tried when YouTube blocks extraction before download.
             "extractor_args": {"youtube": {"player_client": player_clients}},
@@ -110,41 +147,18 @@ async def download_video(youtube_url: str, output_dir: str) -> dict:
 
     def _run():
         last_blocked: Exception | None = None
-        for player_clients in client_orders:
+        for player_clients in _CLIENT_ORDERS:
             try:
                 with yt_dlp.YoutubeDL(_ydl_opts(player_clients)) as ydl:
-                    info = ydl.extract_info(youtube_url, download=True)
-                break
+                    info = ydl.extract_info(youtube_url, download=download)
+                if not info:
+                    raise RuntimeError("yt-dlp returned no video metadata")
+                return info
             except DownloadError as exc:
                 if _blocked_error(exc):
                     last_blocked = exc
                     continue
                 raise
-        else:
-            raise YouTubeDownloadBlocked(_blocked_message()) from last_blocked
-
-        if not info:
-            raise RuntimeError("Download finished but yt-dlp returned no video metadata")
-
-        try:
-            ext = info.get("ext", "mp4")
-            file_path = os.path.join(output_dir, f"video.{ext}")
-            # Prefer .mp4 if formats were merged
-            mp4_path = os.path.join(output_dir, "video.mp4")
-            if os.path.exists(mp4_path):
-                file_path = mp4_path
-            file_path = os.path.abspath(file_path)
-            if not os.path.isfile(file_path):
-                raise FileNotFoundError(
-                    f"Download finished but video file missing: {file_path}"
-                )
-            return {
-                "title": info.get("title", "Untitled Video"),
-                "duration": float(info.get("duration") or 0),
-                "file_path": file_path,
-                "thumbnail_url": _best_thumbnail(info),
-            }
-        except Exception:
-            raise
+        raise YouTubeDownloadBlocked(_blocked_message()) from last_blocked
 
     return await asyncio.to_thread(_run)

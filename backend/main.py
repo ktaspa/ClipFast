@@ -15,7 +15,7 @@ import traceback
 from database import init_db
 from routes import jobs, clips, channels, uploads, socials, activity, billing
 from security import rate_limit_middleware, security_headers_middleware
-from services import channel_monitor
+from services import channel_monitor, youtube_health
 
 
 @asynccontextmanager
@@ -23,12 +23,14 @@ async def lifespan(app: FastAPI):
     os.makedirs("media", exist_ok=True)
     await init_db()
     poll_task = asyncio.create_task(channel_monitor.channel_poll_loop())
+    youtube_health_task = asyncio.create_task(youtube_health.health_loop())
     yield
-    poll_task.cancel()
-    try:
-        await poll_task
-    except asyncio.CancelledError:
-        pass
+    for task in (poll_task, youtube_health_task):
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title="ClipFast API", version="2.0.0", lifespan=lifespan)
@@ -79,4 +81,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "ClipFast API", "version": "2.0.0"}
+    return {
+        "status": "ok",
+        "service": "ClipFast API",
+        "version": "2.0.0",
+        "youtube": youtube_health.snapshot(),
+    }

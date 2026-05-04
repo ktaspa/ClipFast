@@ -7,6 +7,7 @@ from models import Job, Clip, VideoUpload
 from schemas import JobCreate, JobResponse
 from auth import get_current_user_id
 from services.credit_service import reserve_clip_credits, refund_clip_credits
+from services import youtube_service
 import os
 import uuid
 import traceback
@@ -33,6 +34,18 @@ async def create_job(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
+    try:
+        await youtube_service.probe_video_access(payload.youtube_url)
+    except youtube_service.YouTubeDownloadBlocked as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "YouTube download access is temporarily blocked, so ClixFair did not start this job "
+                "or use any clip credits. The system will work again after fresh YouTube cookies or "
+                "a production proxy are configured."
+            ),
+        ) from exc
+
     requested_clip_count = max(1, min(5, int(payload.clip_count)))
     reserved_clip_count = await reserve_clip_credits(db, user_id, requested_clip_count)
     if reserved_clip_count <= 0:
