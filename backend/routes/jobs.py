@@ -269,6 +269,16 @@ async def _process_job(job_id: str):
             await _set_status(db, job_id, "completed")
             await _sync_channel_upload_status(db, job_id, "ready")
 
+        except youtube_service.YouTubeDownloadBlocked as exc:
+            msg = str(exc)
+            print(f"[job {job_id}] YouTube download blocked: {msg}")
+            result = await db.execute(select(Job).where(Job.id == job_id))
+            failed_job = result.scalar_one_or_none()
+            if failed_job:
+                await refund_clip_credits(db, failed_job.user_id, int(failed_job.credit_cost or 1))
+                await db.commit()
+            await _set_status(db, job_id, "failed", msg)
+            await _sync_channel_upload_status(db, job_id, "failed")
         except Exception:
             err = traceback.format_exc()
             print(f"[job {job_id}] FAILED:\n{err}")

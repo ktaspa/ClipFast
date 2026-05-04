@@ -250,6 +250,31 @@ def _drawtext_font_clause() -> str:
     return ":font=DejaVu Sans"
 
 
+def _ffmpeg_preset() -> str:
+    preset = (os.getenv("CLIPFAST_FFMPEG_PRESET") or "faster").strip()
+    allowed = {
+        "ultrafast",
+        "superfast",
+        "veryfast",
+        "faster",
+        "fast",
+        "medium",
+        "slow",
+        "slower",
+        "veryslow",
+    }
+    return preset if preset in allowed else "faster"
+
+
+def _ffmpeg_crf() -> str:
+    raw = (os.getenv("CLIPFAST_FFMPEG_CRF") or "20").strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        value = 20
+    return str(max(16, min(26, value)))
+
+
 def _sanitize_hook_line(text: str) -> str:
     t = " ".join(text.split()).strip().upper()
     # Strip ASS override-tag chars and emoji/symbol pictographs from the persistent hook banner.
@@ -351,8 +376,8 @@ async def _run_ffmpeg(
     cmd += [
         "-c:v", "libx264",
         "-pix_fmt", "yuv420p",
-        "-preset", "medium",
-        "-crf", "20",
+        "-preset", _ffmpeg_preset(),
+        "-crf", _ffmpeg_crf(),
         "-profile:v", "high",
         "-g", "60",
         "-keyint_min", "60",
