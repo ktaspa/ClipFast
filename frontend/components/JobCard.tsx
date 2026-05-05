@@ -29,6 +29,12 @@ const STEPS = [
 
 const ORDER = ["pending","waiting_youtube","downloading","transcribing","analyzing","clipping","completed","failed"] as const;
 
+function currentStepLabel(status: Job["status"]): string {
+  if (status === "waiting_youtube") return "Waiting for YouTube";
+  const step = STEPS.find((s) => s.key === status);
+  return step?.label ?? "Working";
+}
+
 export default function JobCard({ job, onDelete }: Props) {
   const statusIndex = ORDER.indexOf(job.status as typeof ORDER[number]);
 
@@ -68,26 +74,25 @@ export default function JobCard({ job, onDelete }: Props) {
 
       {/* Progress steps for active jobs */}
       {job.status !== "completed" && job.status !== "failed" && (
-        <div className="mt-4 flex items-center gap-1">
-          {STEPS.map((step, i) => {
-            const stepIndex = ORDER.indexOf(step.key as typeof ORDER[number]);
-            const done = statusIndex > stepIndex;
-            const active = statusIndex === stepIndex;
-            return (
-              <div key={step.key} className="flex items-center gap-1 flex-1 last:flex-none">
+        <div className="mt-4">
+          <div className="flex items-center gap-1">
+            {STEPS.map((step) => {
+              const stepIndex = ORDER.indexOf(step.key as typeof ORDER[number]);
+              const done = statusIndex > stepIndex;
+              const active = statusIndex === stepIndex;
+              return (
                 <div
-                  className={`h-1.5 rounded-full flex-1 transition-all ${
+                  key={step.key}
+                  className={`h-1.5 min-w-0 flex-1 rounded-full transition-all ${
                     done ? "bg-violet-500" : active ? "bg-violet-500/60 animate-pulse" : "bg-[#1a1a1a]"
                   }`}
                 />
-                {i === STEPS.length - 1 && (
-                  <span className={`text-xs whitespace-nowrap ${active || done ? "text-violet-400" : "text-slate-600"}`}>
-                    {step.label}
-                  </span>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            {currentStepLabel(job.status)}
+          </p>
         </div>
       )}
 
