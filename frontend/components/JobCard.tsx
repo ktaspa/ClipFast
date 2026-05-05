@@ -19,6 +19,7 @@ function timeAgo(isoDate: string): string {
 }
 
 const STEPS = [
+  { key: "waiting_youtube", label: "Retry" },
   { key: "downloading",  label: "Download" },
   { key: "transcribing", label: "Transcribe" },
   { key: "analyzing",    label: "Analyze" },
@@ -26,7 +27,7 @@ const STEPS = [
   { key: "completed",    label: "Done" },
 ] as const;
 
-const ORDER = ["pending","downloading","transcribing","analyzing","clipping","completed","failed"] as const;
+const ORDER = ["pending","waiting_youtube","downloading","transcribing","analyzing","clipping","completed","failed"] as const;
 
 export default function JobCard({ job, onDelete }: Props) {
   const statusIndex = ORDER.indexOf(job.status as typeof ORDER[number]);

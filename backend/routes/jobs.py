@@ -16,6 +16,13 @@ import asyncio
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
+YOUTUBE_WAITING_STATUS = "waiting_youtube"
+YOUTUBE_WAITING_MESSAGE = (
+    "YouTube is temporarily challenging server downloads. This job is queued and will retry "
+    "automatically. No clip credits are used until clipping actually starts."
+)
+YOUTUBE_WAITING_RETRY_INTERVAL_SEC = int(os.getenv("YOUTUBE_WAITING_RETRY_INTERVAL_SEC", "300"))
+
 
 def _is_db_unreachable(exc: Exception) -> bool:
     if isinstance(exc, (ConnectionRefusedError, OSError)):
@@ -34,19 +41,43 @@ async def create_job(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
+    requested_clip_count = max(1, min(5, int(payload.clip_count)))
+    opts = {
+        "burn_captions": payload.burn_captions,
+        "burn_hook": payload.burn_hook,
+        "letterbox": payload.letterbox,
+        "clip_min_seconds": payload.clip_min_seconds,
+        "clip_max_seconds": payload.clip_max_seconds,
+        "clip_count": requested_clip_count,
+    }
+
     try:
         await youtube_service.probe_video_access(payload.youtube_url)
     except youtube_service.YouTubeDownloadBlocked as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "YouTube download access is temporarily blocked, so ClixFair did not start this job "
-                "or use any clip credits. The system will work again after fresh YouTube cookies or "
-                "a production proxy are configured."
-            ),
-        ) from exc
+        job = Job(
+            id=str(uuid.uuid4()),
+            youtube_url=payload.youtube_url,
+            user_id=user_id,
+            status=YOUTUBE_WAITING_STATUS,
+            error=YOUTUBE_WAITING_MESSAGE,
+            processing_options=json.dumps(opts),
+            credit_cost=0,
+        )
+        db.add(job)
+        try:
+            await db.commit()
+        except Exception as e:
+            await db.rollback()
+            if _is_db_unreachable(e):
+                raise HTTPException(
+                    status_code=503,
+                    detail="Database unavailable (is Postgres running?). Start it with `docker compose up -d postgres` or set DATABASE_URL.",
+                ) from e
+            raise
+        await db.refresh(job)
+        print(f"[job {job.id}] queued waiting for YouTube access: {exc}")
+        return job
 
-    requested_clip_count = max(1, min(5, int(payload.clip_count)))
     reserved_clip_count = await reserve_clip_credits(db, user_id, requested_clip_count)
     if reserved_clip_count <= 0:
         await db.rollback()
@@ -55,14 +86,7 @@ async def create_job(
             detail="You are out of clip credits. Add the $5 pack to generate 20 more clips.",
         )
 
-    opts = {
-        "burn_captions": payload.burn_captions,
-        "burn_hook": payload.burn_hook,
-        "letterbox": payload.letterbox,
-        "clip_min_seconds": payload.clip_min_seconds,
-        "clip_max_seconds": payload.clip_max_seconds,
-        "clip_count": reserved_clip_count,
-    }
+    opts["clip_count"] = reserved_clip_count
     job = Job(
         id=str(uuid.uuid4()),
         youtube_url=payload.youtube_url,
@@ -160,9 +184,37 @@ async def _process_job(job_id: str):
 
         try:
             # 1 — Download
-            await _set_status(db, job_id, "downloading")
             result = await db.execute(select(Job).where(Job.id == job_id))
             job = result.scalar_one()
+            opts: dict = {}
+            if job.processing_options:
+                try:
+                    opts = json.loads(job.processing_options)
+                except (json.JSONDecodeError, TypeError):
+                    opts = {}
+            clip_count = int(opts.get("clip_count", 5))
+            clip_count = max(1, min(5, clip_count))
+
+            if job.user_id and int(job.credit_cost or 0) <= 0:
+                reserved_clip_count = await reserve_clip_credits(db, job.user_id, clip_count)
+                if reserved_clip_count <= 0:
+                    await db.rollback()
+                    await _set_status(
+                        db,
+                        job_id,
+                        "failed",
+                        "This job is ready to clip, but the account is out of clip credits. Add credits and submit again.",
+                    )
+                    return
+                job.credit_cost = reserved_clip_count
+                opts["clip_count"] = reserved_clip_count
+                job.processing_options = json.dumps(opts)
+                await db.commit()
+                clip_count = reserved_clip_count
+
+            job.status = "downloading"
+            job.error = None
+            await db.commit()
 
             video_info = await youtube_service.download_video(job.youtube_url, job_dir)
             job.title = video_info["title"]
@@ -183,19 +235,11 @@ async def _process_job(job_id: str):
 
             # 3 — AI analysis
             await _set_status(db, job_id, "analyzing")
-            opts: dict = {}
-            if job.processing_options:
-                try:
-                    opts = json.loads(job.processing_options)
-                except (json.JSONDecodeError, TypeError):
-                    opts = {}
             burn_captions = bool(opts.get("burn_captions", True))
             burn_hook = bool(opts.get("burn_hook", True))
             letterbox = bool(opts.get("letterbox", True))
             clip_min = float(opts.get("clip_min_seconds", 15))
             clip_max = float(opts.get("clip_max_seconds", 90))
-            clip_count = int(opts.get("clip_count", 5))
-            clip_count = max(1, min(5, clip_count))
 
             clip_suggestions = await ai_service.identify_viral_clips(
                 transcript_data["text"],
@@ -284,14 +328,17 @@ async def _process_job(job_id: str):
 
         except youtube_service.YouTubeDownloadBlocked as exc:
             msg = str(exc)
-            print(f"[job {job_id}] YouTube download blocked: {msg}")
+            print(f"[job {job_id}] YouTube download blocked; queued for retry: {msg}")
             result = await db.execute(select(Job).where(Job.id == job_id))
             failed_job = result.scalar_one_or_none()
             if failed_job:
-                await refund_clip_credits(db, failed_job.user_id, int(failed_job.credit_cost or 1))
+                if failed_job.user_id and int(failed_job.credit_cost or 0) > 0:
+                    await refund_clip_credits(db, failed_job.user_id, int(failed_job.credit_cost or 0))
+                    failed_job.credit_cost = 0
+                failed_job.status = YOUTUBE_WAITING_STATUS
+                failed_job.error = YOUTUBE_WAITING_MESSAGE
                 await db.commit()
-            await _set_status(db, job_id, "failed", msg)
-            await _sync_channel_upload_status(db, job_id, "failed")
+            await _sync_channel_upload_status(db, job_id, "processing")
         except Exception:
             err = traceback.format_exc()
             print(f"[job {job_id}] FAILED:\n{err}")
@@ -302,3 +349,41 @@ async def _process_job(job_id: str):
                 await db.commit()
             await _set_status(db, job_id, "failed", err)
             await _sync_channel_upload_status(db, job_id, "failed")
+
+
+async def retry_waiting_youtube_jobs_once() -> None:
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(Job).where(Job.status == YOUTUBE_WAITING_STATUS).order_by(Job.created_at.asc())
+        )
+        jobs = result.scalars().all()
+
+    for job in jobs:
+        try:
+            await youtube_service.probe_video_access(job.youtube_url)
+        except youtube_service.YouTubeDownloadBlocked:
+            continue
+        except Exception as exc:
+            print(f"[youtube_waiting] probe error for job {job.id}: {exc}")
+            continue
+
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(Job).where(Job.id == job.id))
+            fresh = result.scalar_one_or_none()
+            if not fresh or fresh.status != YOUTUBE_WAITING_STATUS:
+                continue
+            fresh.status = "pending"
+            fresh.error = None
+            await db.commit()
+        print(f"[youtube_waiting] YouTube access restored; starting job {job.id}")
+        asyncio.create_task(_process_job(job.id))
+
+
+async def youtube_waiting_job_loop() -> None:
+    await asyncio.sleep(20)
+    while True:
+        try:
+            await retry_waiting_youtube_jobs_once()
+        except Exception as exc:
+            print(f"[youtube_waiting] loop error: {exc}")
+        await asyncio.sleep(YOUTUBE_WAITING_RETRY_INTERVAL_SEC)

@@ -6,6 +6,7 @@ const CONFIG: Record<
   { label: string; dot: string; bg: string; text: string; pulse?: boolean }
 > = {
   pending:      { label: "Pending",     dot: "bg-slate-400",  bg: "bg-slate-400/10",  text: "text-slate-400" },
+  waiting_youtube: { label: "Retrying", dot: "bg-amber-400", bg: "bg-amber-400/10", text: "text-amber-400", pulse: true },
   downloading:  { label: "Downloading", dot: "bg-blue-400",   bg: "bg-blue-400/10",   text: "text-blue-400",   pulse: true },
   transcribing: { label: "Transcribing",dot: "bg-cyan-400",   bg: "bg-cyan-400/10",   text: "text-cyan-400",   pulse: true },
   analyzing:    { label: "Analyzing",   dot: "bg-violet-400", bg: "bg-violet-400/10", text: "text-violet-400", pulse: true },

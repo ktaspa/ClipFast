@@ -38,7 +38,7 @@ const REVIEW_SORTS: { id: ReviewSort; label: string }[] = [
   { id: "duration_asc", label: "Shortest" },
 ];
 
-const ACTIVE_JOB = new Set(["pending", "downloading", "transcribing", "analyzing", "clipping"]);
+const ACTIVE_JOB = new Set(["pending", "waiting_youtube", "downloading", "transcribing", "analyzing", "clipping"]);
 const HIDDEN_JOBS_KEY = "clipfast_hidden_job_ids";
 const MANUAL_JOB_OPTS_KEY = "clipfast_manual_job_opts";
 

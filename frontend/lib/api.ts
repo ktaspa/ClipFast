@@ -6,6 +6,7 @@ const BASE = "";
 
 export type JobStatus =
   | "pending"
+  | "waiting_youtube"
   | "downloading"
   | "transcribing"
   | "analyzing"

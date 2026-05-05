@@ -18,9 +18,10 @@ import {
   Video,
 } from "lucide-react";
 
-const ACTIVE = new Set(["pending", "downloading", "transcribing", "analyzing", "clipping"]);
+const ACTIVE = new Set(["pending", "waiting_youtube", "downloading", "transcribing", "analyzing", "clipping"]);
 
 const STEPS = [
+  { key: "waiting_youtube", label: "Waiting for YouTube",     icon: "⏳" },
   { key: "downloading",  label: "Downloading video",        icon: "⬇️" },
   { key: "transcribing", label: "Transcribing audio",       icon: "🎙️" },
   { key: "analyzing",    label: "AI analysis",              icon: "🧠" },
@@ -28,7 +29,7 @@ const STEPS = [
   { key: "completed",    label: "Clips ready!",             icon: "✅" },
 ];
 
-const ORDER = ["pending", "downloading", "transcribing", "analyzing", "clipping", "completed", "failed"];
+const ORDER = ["pending", "waiting_youtube", "downloading", "transcribing", "analyzing", "clipping", "completed", "failed"];
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {

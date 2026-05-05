@@ -24,8 +24,9 @@ async def lifespan(app: FastAPI):
     await init_db()
     poll_task = asyncio.create_task(channel_monitor.channel_poll_loop())
     youtube_health_task = asyncio.create_task(youtube_health.health_loop())
+    youtube_waiting_task = asyncio.create_task(jobs.youtube_waiting_job_loop())
     yield
-    for task in (poll_task, youtube_health_task):
+    for task in (poll_task, youtube_health_task, youtube_waiting_task):
         task.cancel()
         try:
             await task
